@@ -3,4 +3,9 @@
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+
+    <string name="explain_permissions">This app needs Location permissions in order to be able to display distances on the driving range. If you do not allow Location access, no distances can be displayed.</string>
+    <string name="button_ok">OK</string>
+    <!-- Error Messages -->
+    <string name="location_generic_error">An error occurred. Cannot determine location.</string>
 </resources>

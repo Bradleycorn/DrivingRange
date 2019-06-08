@@ -2,8 +2,15 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
             xmlns:app="http://schemas.android.com/apk/res-auto"
             xmlns:tools="http://schemas.android.com/tools" android:id="@+id/root_graph"
-            app:startDestination="@id/persimmonFragment">
+            app:startDestination="@id/rangeListFragment">
 
-    <fragment android:id="@+id/persimmonFragment" android:name="net.bradball.android.drivingrange.PersimmonFragment"
+    <fragment android:id="@+id/rangeListFragment"
+              android:name="net.bradball.android.drivingrange.ui.rangeList.RangeListFragment"
+              android:label="fragment_range_list" tools:layout="@layout/fragment_range_list">
+        <action android:id="@+id/action_rangeListFragment_to_persimmonFragment"
+                app:destination="@id/persimmonFragment"/>
+    </fragment>
+
+    <fragment android:id="@+id/persimmonFragment" android:name="net.bradball.android.drivingrange.ui.range.PersimmonFragment"
               android:label="fragment_persimmon" tools:layout="@layout/fragment_persimmon"/>
 </navigation>

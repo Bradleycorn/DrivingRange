@@ -7,14 +7,15 @@ import androidx.lifecycle.ViewModelProvider
 import dagger.Binds
 import dagger.Module
 import dagger.multibindings.IntoMap
+import net.bradball.android.drivingrange.ui.rangeList.RangeListViewModel
 
 @Suppress("unused")
 @Module
 abstract class ViewModelBuildersModule {
-//    @Binds
-//    @IntoMap
-//    @ViewModelKey(TwinspiresActivityViewModel::class)
-//    abstract fun bindTwinsSpiresActivityViewModel(twinspiresActivityViewModel: TwinspiresActivityViewModel): ViewModel
+    @Binds
+    @IntoMap
+    @ViewModelKey(RangeListViewModel::class)
+    abstract fun bindRangeListViewModel(rangeListViewModel: RangeListViewModel): ViewModel
 
     @Binds
     abstract fun bindViewModelFactory(factory: ViewModelFactory): ViewModelProvider.Factory

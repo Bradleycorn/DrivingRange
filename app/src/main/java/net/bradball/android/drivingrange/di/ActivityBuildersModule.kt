@@ -2,7 +2,7 @@ package net.bradball.android.drivingrange.di
 
 import dagger.Module
 import dagger.android.ContributesAndroidInjector
-import net.bradball.android.drivingrange.MainActivity
+import net.bradball.android.drivingrange.ui.DrivingRangeActivity
 
 @Suppress("unused")
 @Module
@@ -21,7 +21,7 @@ abstract class ActivityBuildersModule {
 
 
     @ContributesAndroidInjector(modules = [FragmentBuildersModule::class])
-    abstract fun contributeMainActivity(): MainActivity
+    abstract fun contributeMainActivity(): DrivingRangeActivity
 
 
 }
