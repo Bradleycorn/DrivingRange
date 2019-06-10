@@ -83,6 +83,7 @@ class LocationRepository @Inject constructor(
         }
     }
 
+
     fun onLocationPermissionsResult(result: Int?) {
         if (result == PackageManager.PERMISSION_GRANTED) {
             // TODO ... we have permissions, keep going ...
