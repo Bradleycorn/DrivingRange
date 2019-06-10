@@ -5,7 +5,6 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.common.ConnectionResult
@@ -15,16 +14,20 @@ import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.common.api.ApiException
 import android.os.Looper
 import android.view.View
+import androidx.activity.viewModels
 import androidx.annotation.StringRes
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
 import com.google.android.gms.location.*
 import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
-import dagger.android.DaggerActivity
 import dagger.android.support.DaggerAppCompatActivity
 import net.bradball.android.drivingrange.R
+import net.bradball.android.drivingrange.data.models.LOCATION_ERROR_TYPE
+import net.bradball.android.drivingrange.di.ViewModelFactory
 import net.bradball.android.drivingrange.utilities.ObservableEvent
+import javax.inject.Inject
 
 
 abstract class LocationProviderActivity: DaggerAppCompatActivity() {
@@ -58,6 +61,78 @@ abstract class LocationProviderActivity: DaggerAppCompatActivity() {
             )
         }
     }
+
+
+    @Inject
+    protected lateinit var viewModelFactory: ViewModelFactory
+
+    private val viewModel by viewModels<LocationProviderViewModel> { viewModelFactory }
+
+
+    override fun onResume() {
+        super.onResume()
+
+        viewModel.getLocationErrors().observe(this, Observer { event ->
+            if (event.hasBeenHandled) return@Observer
+
+            when (event.getContent()?.type) {
+                LOCATION_ERROR_TYPE.LOCATION_PERMISSIONS -> {
+                    val shouldProvideRationale =
+                        ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)
+
+                    // Provide an additional rationale to the user. This would happen if the user denied the
+                    // request previously, but didn't check the "Don't ask again" checkbox.
+                    if (shouldProvideRationale) {
+                        // TODO: Show a Snackbar or Dialog, and then ...
+                        showPermissionsRequest()
+                    } else {
+                        showPermissionsRequest()
+                    }
+                }
+                LOCATION_ERROR_TYPE.GOOGLE_PLAY_SERVICES -> {
+                    val google = GoogleApiAvailability.getInstance()
+                    val dialog = google.getErrorDialog(this, event.getContent()?.playServicesError!!,
+                        PLAY_SERVICES_REQUEST
+                    ) {
+                        showErrorSnackbar(Companion.LOCATION_ERROR.PLAY_SERVICES)
+                        _locationErrors.value = ObservableEvent(Companion.LOCATION_ERROR.PLAY_SERVICES)
+                    }
+                    dialog.show()
+                }
+                LOCATION_ERROR_TYPE.LOCATION_SETTINGS -> {
+                    val settingsException = event.getContent()?.exception
+                    val statusCode = (settingsException as ApiException).statusCode
+                    when (statusCode) {
+                        LocationSettingsStatusCodes.RESOLUTION_REQUIRED -> {
+                            Log.d(TAG, "Location not enabled. Trying to show user a dialog to enable them...")
+                            try {
+                                // Show the dialog by calling startResolutionForResult(), and check the
+                                // result in onActivityResult().
+                                (settingsException as? ResolvableApiException)?.startResolutionForResult(this,
+                                    GPS_SETTINGS_REQUEST
+                                )
+                                Log.d(TAG, "Dialog shown. Waiting for user response.")
+                            } catch (e: Exception) {
+                                Log.i(TAG, "Could not start activity to resolve location settings.")
+                                showErrorSnackbar(Companion.LOCATION_ERROR.LOCATION_SETTINGS)
+                                _locationErrors.value = ObservableEvent(Companion.LOCATION_ERROR.LOCATION_SETTINGS)
+                            }
+
+                        }
+                        LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE -> {
+                            val errorMessage = "Location settings are inadequate, and cannot be fixed here. Fix in Settings."
+                            Log.e(TAG, "Can't fix Location Settings automatically. User has to manually go to Settings app.")
+                            showErrorSnackbar(Companion.LOCATION_ERROR.LOCATION_SETTINGS)
+                            _locationErrors.value = ObservableEvent(Companion.LOCATION_ERROR.LOCATION_SETTINGS)
+                        }
+                    }
+
+                }
+            }
+        })
+    }
+
+
 
     abstract fun getSnackbarView(): View
 
@@ -193,16 +268,28 @@ abstract class LocationProviderActivity: DaggerAppCompatActivity() {
 
     private fun onGpsPermissionsResult(results: IntArray) {
         Log.d(TAG, "Checking Permissions Request Result...")
-        if (results.getOrNull(0) == PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "Permissions Result: Granted.")
-            if (_locationLiveData.hasActiveObservers() && checkGooglePlayServices()) {
-                startLocationUpdates()
-            }
-        } else {
+
+        val result = results.getOrNull(0)
+
+        //TODO Move this logic to the viewModel
+        if (result != PackageManager.PERMISSION_GRANTED) {
             showErrorSnackbar(Companion.LOCATION_ERROR.PERMISSION_DENIED)
             _locationErrors.value = ObservableEvent(Companion.LOCATION_ERROR.PERMISSION_DENIED)
             Log.d(TAG, "Permissions Result: Denied.")
         }
+
+        viewModel.onLocationPermissionResult(result)
+
+//        if (results.getOrNull(0) == PackageManager.PERMISSION_GRANTED) {
+//            Log.d(TAG, "Permissions Result: Granted.")
+//            if (_locationLiveData.hasActiveObservers() && checkGooglePlayServices()) {
+//                startLocationUpdates()
+//            }
+//        } else {
+//            showErrorSnackbar(Companion.LOCATION_ERROR.PERMISSION_DENIED)
+//            _locationErrors.value = ObservableEvent(Companion.LOCATION_ERROR.PERMISSION_DENIED)
+//            Log.d(TAG, "Permissions Result: Denied.")
+//        }
     }
 
     private fun checkGooglePlayServices(): Boolean {
@@ -265,17 +352,27 @@ abstract class LocationProviderActivity: DaggerAppCompatActivity() {
     }
 
     private fun onGpsSettingsResult(resultCode: Int) {
-        when (resultCode) {
-            Activity.RESULT_OK -> {
-                Log.d(TAG, "Settings Enabled. Good To go.")
-                watchLocation()
-            }
-            Activity.RESULT_CANCELED -> {
-                Log.d(TAG, "Settings not enabled. Need to stop.")
-                showErrorSnackbar(Companion.LOCATION_ERROR.LOCATION_DISABLED)
-                _locationErrors.value = ObservableEvent(Companion.LOCATION_ERROR.LOCATION_DISABLED)
-            }
+
+        // TODO move this logic to the viewModel
+        if (resultCode == Activity.RESULT_CANCELED) {
+            Log.d(TAG, "Settings not enabled. Need to stop.")
+            showErrorSnackbar(Companion.LOCATION_ERROR.LOCATION_DISABLED)
+            _locationErrors.value = ObservableEvent(Companion.LOCATION_ERROR.LOCATION_DISABLED)
         }
+
+        viewModel.onLocationSettingsResult(resultCode)
+
+//        when (resultCode) {
+//            Activity.RESULT_OK -> {
+//                Log.d(TAG, "Settings Enabled. Good To go.")
+//                watchLocation()
+//            }
+//            Activity.RESULT_CANCELED -> {
+//                Log.d(TAG, "Settings not enabled. Need to stop.")
+//                showErrorSnackbar(Companion.LOCATION_ERROR.LOCATION_DISABLED)
+//                _locationErrors.value = ObservableEvent(Companion.LOCATION_ERROR.LOCATION_DISABLED)
+//            }
+//        }
     }
 
 }
