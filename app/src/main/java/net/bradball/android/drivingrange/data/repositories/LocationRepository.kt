@@ -18,6 +18,7 @@ import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
 import net.bradball.android.drivingrange.data.models.LOCATION_ERROR_TYPE
 import net.bradball.android.drivingrange.data.models.LocationCheckError
+import net.bradball.android.drivingrange.utilities.LocationSettingsLiveData
 import net.bradball.android.drivingrange.utilities.ObservableEvent
 import javax.inject.Inject
 
@@ -40,6 +41,8 @@ class LocationRepository @Inject constructor(
         }
     }
 
+
+
     private fun getLocationRequest(locationType: LOCATION_TYPE): LocationRequest {
         return LocationRequest.create().apply {
                 interval = (LOCATION_UPDATE_INTERVAL_SECONDS * 1000).toLong()
@@ -53,16 +56,11 @@ class LocationRepository @Inject constructor(
         return LocationSettingsRequest.Builder().addLocationRequest(locationRequest).build()
     }
 
-    private val locationCallback = object: LocationCallback() {
-        override fun onLocationResult(locationResult: LocationResult) {
-            Log.d(TAG, "Location Received: $locationResult")
-            //TODO: Set LiveData Value
-            //_locationLiveData.value = locationResult.lastLocation
-        }
-    }
+
 
     private val _locationErrors = MutableLiveData<ObservableEvent<LocationCheckError>>()
     val locationErrors: LiveData<ObservableEvent<LocationCheckError>> = _locationErrors
+
 
     fun trackLocation(context: Context, locationType: LOCATION_TYPE): LiveData<Location> {
         return object: MediatorLiveData<Location>() {
@@ -71,7 +69,8 @@ class LocationRepository @Inject constructor(
                 Log.d(TAG, "Location LiveData is Active")
                 if (checkLocationPermissions(context) && checkGooglePlayServices(context)) {
                     Log.d(TAG, "All Systems Go!")
-                    startLocationUpdates()
+                    val locationRequest = getLocationRequest(locationType)
+                    checkLocationSettings(locationType)
                 }
             }
 
@@ -79,6 +78,13 @@ class LocationRepository @Inject constructor(
                 super.onInactive()
                 Log.d(TAG, "Location LiveData is InActive")
                 locationClient.removeLocationUpdates(locationCallback)
+            }
+
+            private val locationCallback = object: LocationCallback() {
+                override fun onLocationResult(locationResult: LocationResult) {
+                    Log.d(TAG, "Location Received: $locationResult")
+                    value = locationResult.lastLocation
+                }
             }
         }
     }
