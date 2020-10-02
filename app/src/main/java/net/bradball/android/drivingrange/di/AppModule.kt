@@ -22,6 +22,6 @@ open class AppModule {
 
 //    @Singleton
 //    @Provides
-//    open fun providesAppDatabase(app: TwinspiresApp): IAppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "AppDB").build()
+//    open fun providesAppDatabase(app: DrivingRangeApplication): IAppDatabase = Room.databaseBuilder(app, AppDatabase::class.java, "AppDB").build()
 
 }
